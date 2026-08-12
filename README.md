@@ -26,6 +26,12 @@ The driver runs a **controller** (provisioning/deprovisioning) and a **node** Da
 - `cryptsetup` available on every node
 - Privileged containers allowed (LUKS needs it)
 
+⚠️ **`node.kubeletDir` must be the kubelet root as resolved on the host.** Where `/var/lib/kubelet`
+is a symlink — microk8s points it at `/var/snap/microk8s/common/var/lib/kubelet` — the driver's
+mounts would otherwise land inside its own container, invisible to the host. Check with
+`readlink -f /var/lib/kubelet` and set the value to match; the node driver refuses to become
+ready when it cannot see that path.
+
 ---
 
 ## Install (Helm)
@@ -240,8 +246,8 @@ make kind-clean    # tear down
 
 ```bash
 # Driver logs
-kubectl logs -n kube-system -l app=lukscryptwalker-csi-node
-kubectl logs -n kube-system -l app=lukscryptwalker-csi-controller
+kubectl logs -n kube-system -l app.kubernetes.io/component=node -c lukscryptwalker-csi
+kubectl logs -n kube-system -l app.kubernetes.io/component=controller -c lukscryptwalker-csi
 
 # LUKS state on a node
 sudo cryptsetup status && ls -la /dev/mapper/
