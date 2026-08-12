@@ -384,6 +384,21 @@ func (ns *NodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 			metrics.RecordOperation("stage_volume", "error", time.Since(startTime).Seconds())
 			return nil, status.Errorf(codes.Internal, "Failed to mount and configure volume: %v", err)
 		}
+
+		// mountAndConfigureVolume can succeed while the mount is only visible
+		// inside this container (kubelet root mismatch). Publishing then hands the
+		// consumer a bare host directory and it writes PLAINTEXT to the node disk.
+		// Assert host visibility here so the failure surfaces at stage time.
+		if !ns.isMountPoint(stagingTargetPath) {
+			if cerr := ns.luksManager.CloseLUKS(stageParams.mapperName); cerr != nil {
+				klog.Warningf("Volume %s: failed to close LUKS after host-visibility check: %v", volumeID, cerr)
+			}
+			metrics.RecordOperation("stage_volume", "error", time.Since(startTime).Seconds())
+			return nil, status.Errorf(codes.Internal,
+				"staged %s but it is not a mount point in the host namespace; the volume would be "+
+					"published UNENCRYPTED. Check that node.kubeletDir matches `readlink -f /var/lib/kubelet` "+
+					"on the host (resolved: %s)", stagingTargetPath, resolveKubeletRoot())
+		}
 	}
 
 	// Record metrics for successful staging

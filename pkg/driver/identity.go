@@ -97,6 +97,21 @@ func (ids *IdentityServer) GetPluginInfo(ctx context.Context, req *csi.GetPlugin
 func (ids *IdentityServer) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	klog.V(5).Info("Probe called")
 
+	// Node mode only: a kubelet root we cannot see means every mount we make is
+	// invisible to the host and volumes would be published unencrypted, so never
+	// report ready. Controller pods construct a NodeServer too but have no kubelet
+	// mounts, so gating them on this crash-loops the control plane.
+	if ids.driver != nil && ids.driver.IsNodeMode() {
+		if root, ok := kubeletRootVisible(); !ok {
+			klog.Errorf("Probe failing: kubelet root %s is not visible inside the driver container; "+
+				"volumes would be published UNENCRYPTED. Set node.kubeletDir to %s", root, root)
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"kubelet root %s is not visible inside the driver container: mounts would land in the "+
+					"container namespace and volumes would be published UNENCRYPTED. Set node.kubeletDir to %s",
+				root, root)
+		}
+	}
+
 	probe := startOrJoinLibrcloneProbe()
 
 	var reason string

@@ -439,6 +439,25 @@ func resolveKubeletRoot() string {
 	return resolved
 }
 
+// kubeletRootVisible reports whether the host-resolved kubelet root is reachable
+// from inside this container, and the path it resolved to.
+//
+// When it is not reachable, every mount the driver makes lands in the container's
+// own namespace: the host sees a bare directory, consumers bind that, and pods
+// write PLAINTEXT to the node disk while each step reports success. There is no
+// configuration in which that is recoverable at runtime, so the driver reports
+// itself unhealthy rather than serving requests that silently drop encryption.
+//
+// This checks the kubelet ROOT, not the CSI plugin subdirectory: kubelet creates
+// the latter lazily, so a fresh node with no volumes would otherwise look broken.
+func kubeletRootVisible() (string, bool) {
+	root := resolveKubeletRoot()
+	if _, err := os.Stat(root); err != nil {
+		return root, false
+	}
+	return root, true
+}
+
 // cleanupStaleS3Mounts cleans up stale or missing S3/FUSE mounts that may remain after
 // an unclean shutdown (e.g., OOM kill). For S3 volumes, it attempts to restore
 // the mount instead of just unmounting to keep existing pods working.

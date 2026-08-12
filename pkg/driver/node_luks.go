@@ -110,6 +110,17 @@ func (ns *NodeServer) restoreLUKSVolumeStaging(ctx context.Context, volumeID, st
 		return fmt.Errorf("failed to restore LUKS device and mount: %v", err)
 	}
 
+	// The mount must be visible in the HOST namespace. If our view of the kubelet
+	// root does not match the host's (node.kubeletDir left at the /var/lib/kubelet
+	// symlink on microk8s), the mount lands inside this container: the host sees a
+	// bare directory, the consumer binds that, and the pod writes PLAINTEXT to the
+	// node disk while every step reports success. Fail the publish instead.
+	if !ns.isMountPoint(stagingTargetPath) {
+		return fmt.Errorf("staging path %s is not a mount point in the host namespace after restore; "+
+			"the volume would be published UNENCRYPTED. Check that node.kubeletDir matches "+
+			"`readlink -f /var/lib/kubelet` on the host (resolved: %s)", stagingTargetPath, resolveKubeletRoot())
+	}
+
 	klog.Infof("Successfully restored LUKS volume %s", volumeID)
 	return nil
 }
