@@ -172,6 +172,11 @@ func (ns *NodeServer) runStaleS3MountChecker() {
 			// StatefulSet ordinal forever; reconcile never revisits it once
 			// the mount looks healthy again.
 			ns.sweepStuckTerminatingConsumers()
+			// DeleteVolume is controller-side and cannot reach node-local
+			// backing files, so reclaiming them is ours. Running this only at
+			// startup meant every PVC deleted while we were up leaked a
+			// full-size .img until the next driver restart.
+			ns.cleanupOrphanedVolumes()
 		}
 		tick++
 		ns.runCheckerTickWatched()
