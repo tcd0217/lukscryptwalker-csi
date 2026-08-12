@@ -156,6 +156,14 @@ func (sm *S3SyncManager) isVolumeSetupInProgress(volumeID string) bool {
 	return sm.volumesInSetup[volumeID]
 }
 
+// HasSync checks if a volume has an active S3 sync (mount manager)
+func (sm *S3SyncManager) HasSync(volumeID string) bool {
+	sm.mutex.RLock()
+	defer sm.mutex.RUnlock()
+	_, exists := sm.mountManagers[volumeID]
+	return exists
+}
+
 // isS3Backend checks if the volume is configured for S3 backend
 func (ns *NodeServer) isS3Backend(volumeContext map[string]string) bool {
 	storageBackend, exists := volumeContext[StorageBackendParam]

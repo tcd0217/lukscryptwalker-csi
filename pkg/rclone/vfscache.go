@@ -184,6 +184,12 @@ func isVFSCacheMounted(mountPath string) bool {
 	return cmd.Run() == nil
 }
 
+// IsVFSCacheMounted reports whether the encrypted VFS cache is mounted at its
+// default path. Exported for the metrics collector.
+func IsVFSCacheMounted() bool {
+	return isVFSCacheMounted(VFSCacheBasePath)
+}
+
 // cleanupStaleVFSCache cleans up any stale VFS cache state
 func cleanupStaleVFSCache(mountPath string) {
 	luksManager := luks.NewLUKSManager()
